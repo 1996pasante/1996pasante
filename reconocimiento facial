@@ -1,0 +1,53 @@
+from keras_vggface.vggface import VGGFace
+from keras_vggface.utils import preprocess_input
+from keras.preprocessing import image
+import numpy as np
+
+# Cargar el modelo preentrenado
+model = VGGFace(model='resnet50', include_top=False, input_shape=(224, 224, 3), pooling='avg')
+
+def extract_features(img_path):
+    img = image.load_img(img_path, target_size=(224, 224))
+    img_array = image.img_to_array(img)
+    img_array = np.expand_dims(img_array, axis=0)
+    img_array = preprocess_input(img_array)
+    features = model.predict(img_array)
+    return features
+import os
+
+def build_embeddings_dataset(image_dir):
+    embeddings = []
+    labels = []
+    for person_name in os.listdir(image_dir):
+        person_dir = os.path.join(image_dir, person_name)
+        for img_name in os.listdir(person_dir):
+            img_path = os.path.join(person_dir, img_name)
+            features = extract_features(img_path)
+            embeddings.append(features)
+            labels.append(person_name)
+    return np.array(embeddings), np.array(labels)
+from sklearn.svm import SVC
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
+
+# Dividir los datos en entrenamiento y prueba
+embeddings, labels = build_embeddings_dataset('path_to_images')
+X_train, X_test, y_train, y_test = train_test_split(embeddings, labels, test_size=0.2, random_state=42)
+
+# Entrenar un SVM
+clf = make_pipeline(StandardScaler(), SVC(kernel='linear', probability=True))
+clf.fit(X_train, y_train)
+def recognize_face(img_path, model, clf):
+    features = extract_features(img_path)
+    prediction = clf.predict(features)
+    return prediction
+
+# Ejemplo de uso
+img_path = 'path_to_new_image.jpg'
+identity = recognize_face(img_path, model, clf)
+print(f'La persona en la imagen es: {identity}')
+from sklearn.metrics import accuracy_score
+
+y_pred = clf.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f'Precisión del modelo: {accuracy}')
